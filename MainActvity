@@ -1,0 +1,68 @@
+#Copyright [2018] [Govern-Sunfe]
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.You may obtain a copy of the License at
+# 
+#http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions andlimitations under the License.
+
+private FragmentManager fManager;
+	private RecordFragment_f rFragment;
+	private RecordFragment rFragment1;
+protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
+		findId();
+		fManager = getFragmentManager();//打开FragmentManager
+		but_log.performClick();//模拟点击“联系记录”按钮
+	           
+	}
+public void onClick(View v) {//点击事件
+		// TODO Auto-generated method stub
+		FragmentTransaction fTransaction =fManager.beginTransaction();
+		hideAllFragment(fTransaction);//隐藏所有Fragment
+		switch (v.getId()) {
+		case R.id.but_log:
+				Log.i("Main", "" + select);
+				select = true;//用于测试时是否点击成功
+				setButOnClik(but_log, but_phone);
+				if (rFragment1 == null) {
+					rFragment1 = new RecordFragment();
+					fTransaction.add(R.id.ly_content, rFragment1);
+				} else
+					fTransaction.show(rFragment1);
+			break;
+		case R.id.but_phone:
+				Log.i("Main", "" + select);
+				select = false; //用于测试时是否点击成功
+				setButOnClik(but_phone, but_log);
+				if (rFragment == null) {
+					rFragment = new RecordFragment_f();
+					fTransaction.add(R.id.ly_content, rFragment);
+				} else
+					fTransaction.show(rFragment);
+			break;
+		default:
+			break;
+		}
+		fTransaction.commit();//提交
+	}
+
+	// 隐藏所有Fragment
+	private void hideAllFragment(FragmentTransaction fragmentTransaction) {
+		if (rFragment != null)
+			fragmentTransaction.hide(rFragment);
+		if (rFragment1 != null)
+			fragmentTransaction.hide(rFragment1);
+	}
+
+	// 改变按钮按下后的颜色与样式
+	public void setButOnClik(Button b, Button b1) {
+		b.setBackgroundResource(R.drawable.tab_ba);
+		b.setTextColor(Color.parseColor("#ffffff"));
+		b1.setBackgroundResource(R.drawable.tab_b);
+		b1.setTextColor(Color.parseColor("#17a7de"));
+	}
