@@ -1,0 +1,129 @@
+#Copyright [2018] [Govern-Sunfe]
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.You may obtain a copy of the License at
+# 
+#http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions andlimitations under the License.
+
+public class MyService extends Service {
+	private MediaRecorder mr = null;
+	private File soundFile;// 为了获得路径
+	private String number;// 号码
+	private String name;// 号码
+	private String start_time;// 电话开始时间
+	private String start_time1;// 电话开始时间
+	private String end_time;// 电话结束时间
+	SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	private final String TAG = "TestService1";
+
+	// 必须要实现的方法
+	@Override
+	public IBinder onBind(Intent intent) {
+		Log.i(TAG, "onBind方法被调用!");
+		return null;
+	}
+
+	// Service被创建时调用
+	@Override
+	public void onCreate() {
+		Log.i(TAG, "onCreate方法被调用!");
+		super.onCreate();
+	}
+
+	// Service被启动时调用
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		number = (String) intent.getExtras().get("number");
+		name = (String) intent.getExtras().get("name");
+		startRecord();
+		return super.onStartCommand(intent, flags, startId);
+	}
+
+	// Service被关闭之前回调
+	@Override
+	public void onDestroy() {
+		Log.i(TAG, "onDestory方法被调用!");
+		stopRecord();
+		super.onDestroy();
+	}
+
+	// 开始录制
+	private void startRecord() {
+		Calendar c = Calendar.getInstance();
+		start_time = c.get(Calendar.YEAR) + "-" + c.get(Calendar.MONTH) + "-" + c.get(Calendar.DAY_OF_MONTH) + " "
+				+ c.get(Calendar.HOUR_OF_DAY) + ":" + c.get(Calendar.MINUTE) + ":" + c.get(Calendar.SECOND);
+		start_time1 = c.get(Calendar.YEAR) + "-" + c.get(Calendar.MONTH) + "-" + c.get(Calendar.DAY_OF_MONTH) + " "
+				+ c.get(Calendar.HOUR_OF_DAY) + ":" + c.get(Calendar.MINUTE);
+		if (mr == null) {
+			File dir = new File(Environment.getExternalStorageDirectory(), "sounds");// 获取sd卡//的目录
+			if (!dir.exists()) {//目录不存在泽创建目录
+				dir.mkdirs();
+			}
+			soundFile = new File(dir, System.currentTimeMillis() + ".amr");
+			if (!soundFile.exists()) {
+				try {//文件不存在则创建文件
+					soundFile.createNewFile();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			mr = new MediaRecorder();
+			mr.setAudioSource(MediaRecorder.AudioSource.MIC); // 音频输入源
+			mr.setOutputFormat(MediaRecorder.OutputFormat.AMR_WB); // 设置输出格式
+			mr.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_WB); // 设置编码格式
+			mr.setOutputFile(soundFile.getAbsolutePath());
+			Log.i("Service", "I want to see where you are " + soundFile.getAbsolutePath());
+			try {
+				mr.prepare();
+				mr.start(); // 开始录制
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	// 停止录制 并把相关数据存入数据库中
+	private void stopRecord() {
+		Log.i("MyService", "stopRecord");
+		if (mr != null) {
+			// 关闭录音
+			mr.stop();
+			mr.release();
+			mr = null;
+			Log.i("stopRecord", "STOP MR");
+			// 获得时间
+			Calendar c = Calendar.getInstance();
+			end_time = c.get(Calendar.YEAR) + "-" + c.get(Calendar.MONTH) + "-" + c.get(Calendar.DAY_OF_MONTH) + " "
+					+ c.get(Calendar.HOUR_OF_DAY) + ":" + c.get(Calendar.MINUTE) + ":" + c.get(Calendar.SECOND);
+			Log.i("stopRecord", "GET TIME");
+			// 获得时间间隔
+			Date begin = null;
+			Date end = null;
+			try {
+				begin = sdf.parse(start_time);
+				end = sdf.parse(end_time);
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				Log.i("stopRecord", "there have worry");
+			}
+			String between = ((end.getTime() - begin.getTime()) / 1000) / 60 + ":"
+					+ ((end.getTime() - begin.getTime()) / 1000) % 60;
+			ContentValues cv = new ContentValues();
+			cv.put("number", number);
+			cv.put("tab", name);
+			cv.put("star_time", start_time1);
+			cv.put("finish_time", end_time);
+			cv.put("used_time", between);
+			cv.put("absolutePath", soundFile.getAbsolutePath());
+			DBOpenHelper helper = new DBOpenHelper(getApplicationContext(), "mylister.db", null, 1);
+			SQLiteDatabase db = helper.getWritableDatabase();
+			db.insert("Lister_info", null, cv);
+			db.close();
+			Log.i("stopRecord", "sucess");
+		}
+	}
+}
