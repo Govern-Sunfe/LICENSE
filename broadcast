@@ -1,0 +1,107 @@
+#Copyright [2018] [Govern-Sunfe]
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.You may obtain a copy of the License at
+# 
+#http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions andlimitations under the License.
+
+public class MyReceiver extends BroadcastReceiver {
+	private static final int DB_VERSION = 1;
+	static boolean is;
+
+	@Override
+	public void onReceive(Context context, Intent intent) {
+		// TODO: This method is called when the BroadcastReceiver is receiving
+		if (intent.getAction().equals(Intent.ACTION_NEW_OUTGOING_CALL)) {
+			// 获取去电电话号码
+			String phoneNum = intent.getStringExtra(Intent.EXTRA_PHONE_NUMBER);
+			Log.i("hg", " 拨打电话" + "phoneNum: " + phoneNum);
+			// 判断是否为监听联系人
+			is_start_Lister(context, phoneNum);
+		}
+		if (intent.getAction().equals("android.intent.action.PHONE_STATE")) {
+			Log.i("MyBoardReceiver", "is you?");
+			TelephonyManager tm = (TelephonyManager) context.getSystemService(Service.TELEPHONY_SERVICE);
+			// 获取来电电话号码
+			String incomingnumber = intent.getStringExtra("incoming_number");
+			Log.i("hg", "incomingnumber=" + incomingnumber);
+			// 判断是否为监听联系人
+			is_start_Lister(context, incomingnumber);
+			switch (tm.getCallState()) {
+			case TelephonyManager.CALL_STATE_RINGING:
+				Log.i("hg", "电话状态……RINGING+当处于拨号状态中.."); // 电话等待接听
+				break;
+			case TelephonyManager.CALL_STATE_OFFHOOK: // 电话接听
+				Log.i("hg", "电话状态……OFFHOOK+当处于通话中");
+				star_Service(context);
+				break;
+			case TelephonyManager.CALL_STATE_IDLE: // 电话挂机
+				Log.i("hg", "电话状态……IDLE+ 当处于待机状态中");
+				is_end_Lister(context);
+				break;
+			}
+		}
+	}
+
+	public void is_start_Lister(Context context, String Number) {
+//判断是否为监听号码
+		Log.i("MyBoardReceiver", "is_start_Lister?");
+		if (Number != null) {
+			Log.i("MyBoardReceiver", Number);
+			DBOpenHelper helper = new DBOpenHelper(context, "mylister.db", null, DB_VERSION);
+			SQLiteDatabase db = helper.getWritableDatabase();
+			Cursor cursor = db.rawQuery("SELECT * FROM Lister where number=?", new String[] { Number });
+			Log.i("MyBoardReceiver", "" + cursor.getCount());
+			if (cursor.getCount() > 0) {
+				cursor.moveToFirst();
+				Log.i("MyBoardReceiver",
+						"yes!数据库中此人确实是监听对象" + Number + "?" + cursor.getString(cursor.getColumnIndex("name")));
+// 数据库中此人确实是监听对象将其写入SharedPreferences中以备下次电话//挂起再使用
+				SharedPreferences sp = context.getSharedPreferences("MyInfo", Context.MODE_PRIVATE);
+				SharedPreferences.Editor ed = sp.edit();
+				ed.putString("number", Number);
+				ed.putString("name", cursor.getString(cursor.getColumnIndex("name")));
+				ed.putBoolean("key", true);// 改邪归正 写入sharedPreferences
+				ed.commit();
+			} else {
+				Log.i("MyBoardReceiver", "NO");
+			}
+			db.close(); // 操作完成后关闭数据库连接
+		}
+	}
+
+	public void star_Service(Context context) {// 是否开启服务
+		Log.i("MyBoardReceiver", "Service is ready");
+		SharedPreferences sp = context.getSharedPreferences("MyInfo", Context.MODE_PRIVATE);
+		if (sp.getBoolean("key", false)) {//在SharedPreference读书数据
+			Log.i("MyBoardReceiver", "让我们开始吧" + sp.getBoolean("key", false));
+			Intent service = new Intent(context, MyService.class);
+			// service.setAction("com.example.service.MYSERVICE");
+			service.putExtra("number", sp.getString("number", "基拉"));
+			service.putExtra("name", sp.getString("name", "110"));
+			Log.e("last", sp.getString("number", "基拉") + sp.getString("name", "110"));// 你出错我就报警了！！！！
+			context.startService(service);
+		} else {
+			Log.i("MyBoardReceiver", "key said No");
+		}
+	}
+
+	public void is_end_Lister(Context context) {// 判断服务是否启动并是否关闭服务
+		Log.i("MyBoardReceiver", "is_end_Lister?");
+		SharedPreferences sp = context.getSharedPreferences("MyInfo", Context.MODE_PRIVATE);
+		if (sp.getBoolean("key", false)) {
+			SharedPreferences.Editor ed = sp.edit();
+			ed.putBoolean("key", false);
+			Intent service = new Intent(context, MyService.class);
+			service.setAction("com.example.service.MYSERVICE");
+			context.stopService(service);
+			Log.i("in Broadcast", "stopService");
+		} else {
+			Log.i("MyBoardReceiver", "No This");
+		}
+	}
+}
