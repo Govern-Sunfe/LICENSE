@@ -1,0 +1,230 @@
+#Copyright [2018] [Govern-Sunfe]
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.You may obtain a copy of the License at
+# 
+#http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions andlimitations under the License.
+
+public class RecordFragment extends Fragment implements OnClickListener {
+	private SeekBar seekbar;// 滑动条
+	private ImageButton media;// 开始 暂停按钮
+	private ListView lister_list; 
+	private TextView pase_time;// 音乐播放的时间
+	private TextView total_time;// 音乐总时常
+	private Cursor cursor;
+	private My_super_Asapter adapter;
+	private MediaPlayer myPlayer = null;
+	private boolean isRelease = false;// 音乐是否在播放的标志
+	private int musicSize;
+	private int last_position = -1;// 记录上次的点击
+	private View Last_view;
+	// 线程
+	private Handler handler = new Handler();
+	private Runnable run = new Runnable() {
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			updateTime();// 时间更新
+			seekbar.setProgress(100 * myPlayer.getCurrentPosition() / myPlayer.getDuration());
+			// 进度条更新
+			handler.postDelayed(run, 1000);
+		}
+	};
+
+	@Override
+	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+		// TODO Auto-generated method stub
+		View view = inflater.inflate(R.layout.activity_add_contact, container, false);
+		findId(view);
+		return view;
+	}
+
+	@Override
+	public void onActivityCreated(Bundle savedInstanceState) {
+		// TODO Auto-generated method stub
+		super.onActivityCreated(savedInstanceState);
+		adapter_list();
+		listClick();
+	}
+
+	public void adapter_list() {
+		Log.i("in RecordFragment", "adapter_list");
+		DBOpenHelper help = new DBOpenHelper(getActivity(), "mylister.db", null, 1);
+		SQLiteDatabase db = help.getWritableDatabase();
+		cursor = db.rawQuery("SELECT * FROM Lister_info", null);
+		adapter = new My_super_Asapter(getActivity(), cursor);
+		lister_list.setAdapter(adapter);
+		myPlayer = new MediaPlayer();
+	}
+
+	public void listClick() {
+		Log.i("Fragment", "This is listClick()");
+		media.setOnClickListener(this);
+		lister_list.setOnItemClickListener(new OnItemClickListener() {
+			// list的点击事件 点击后音乐播放
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+				Log.e("RecordFr 看看是不是你出的问题", "position" + position);
+				if (last_position == -1) {
+					view.setBackgroundResource(R.drawable.list_select);
+				} else {
+					Last_view.setBackgroundResource(R.drawable.list_unselect);
+					Log.e("RecordFr 看看", "1position" + position);
+					view.setBackgroundResource(R.drawable.list_select);
+					Log.e("RecordFr 看看", "2position" + position);
+					last_position = position;
+					Last_view = view;
+				}
+				last_position = position;
+				Last_view = view;
+				try {
+					seekbar.setProgress(0);
+					myPlayer.reset(); // 重置
+			myPlayer.setDataSource(adapter.getAbsolutePath(position));
+					myPlayer.prepare(); // 准备
+					myPlayer.start(); // 播放
+				} catch (Exception e) {
+					Log.i("Fragment", "播放出了一点问题");
+				}
+				handler.post(run);
+				// 设置播放总时常
+				musicSize = myPlayer.getDuration() / 1000;
+				int m = musicSize / 60;
+				int s = musicSize % 60;
+				if (s > 9)
+					total_time.setText(m + ":" + s);
+				else
+					total_time.setText(m + ":0" + s);
+				isRelease = true;
+				media.setImageResource(R.drawable.start);
+			}
+
+		});
+		lister_list.setOnItemLongClickListener(new OnItemLongClickListener() {// 长按其中一项
+			// 长按后删除这一段录音
+			@Override
+			public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+				// TODO Auto-generated method stub
+				deleteItem(adapter.getAbsolutePath(position));
+				return false;
+			}
+		});
+		seekbar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+
+			@Override
+			public void onStopTrackingTouch(SeekBar seekBar) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void onStartTrackingTouch(SeekBar seekBar) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				// TODO Auto-generated method stub
+				if (last_position == -1) {
+					seekBar.setProgress(0);
+				} else if (seekbar.getProgress() == 100) { //  将按钮设为暂停
+					isRelease = false;
+					media.setImageResource(R.drawable.pause);
+				} else if (fromUser) {
+					myPlayer.seekTo(myPlayer.getDuration() * progress / 100);
+				}
+
+			}
+
+		});
+	}
+
+	public void findId(View view) {
+		seekbar = (SeekBar) view.findViewById(R.id.seekBar);
+		media = (ImageButton) view.findViewById(R.id.but_start);
+		lister_list = (ListView) view.findViewById(R.id.lister_list);
+		pase_time = (TextView) view.findViewById(R.id.pase_time);
+		total_time = (TextView) view.findViewById(R.id.total_time);
+	}
+
+	@Override
+	public void onClick(View v) {
+		// TODO Auto-generated method stub
+		Log.i("Fragement", );
+		switch (v.getId()) {
+		case R.id.but_start:
+			if (last_position == -1) {
+				Toast.makeText(getActivity(), "请点击一段录音哦！亲0.0亲", Toast.LENGTH_SHORT).show();
+				media.setImageResource(R.drawable.pause);
+			} else if (isRelease) {// 音乐暂停
+				isRelease = false;
+				myPlayer.pause();
+				media.setImageResource(R.drawable.pause);
+			} else if (!isRelease) {// 音乐开始播放
+				if (seekbar.getProgress() == 100) {// 一段录音结束后点击按钮重新播放
+					seekbar.setProgress(0);
+				}
+				isRelease = true;
+				myPlayer.start();
+				media.setImageResource(R.drawable.start);
+			} else {
+				Toast.makeText(getActivity(), "还有这个可能性吗!", Toast.LENGTH_SHORT).show();
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	// 当前时间更新
+	protected void updateTime() {
+		if (last_position != -1) {
+			int m = myPlayer.getCurrentPosition() / 60000;
+			int s = myPlayer.getCurrentPosition() % 60000 / 1000;
+			if (s < 10)
+				pase_time.setText(m + ":0" + s);
+			else
+				pase_time.setText(m + ":" + s);
+		}
+	}
+
+	// 长按后的dialog显示
+	protected void deleteItem(final String absolutepath) {
+		new AlertDialog.Builder(getActivity()).setTitle("刪除此項？")
+				.setPositiveButton("刪除", new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int which) {
+						deleteFile(absolutepath);// 删除文件
+						// 删除数据库数据
+						DBOpenHelper help = new DBOpenHelper(getActivity(), "mylister.db", null, 1);
+						SQLiteDatabase db = help.getWritableDatabase();
+						db.delete("Lister_info", "absolutePath=?", new String[] { absolutepath });
+						adapter_list();// 并更新
+					}
+				}).setNegativeButton("取消", null).show();
+	}
+
+	// 刪除指定文件
+	public boolean deleteFile(String filePath) {
+		File file = new File(filePath);
+		if (file.isFile() && file.exists()) {
+			return file.delete();
+		}
+		return false;
+	}
+
+	@Override
+	public void onDestroy() {
+		// TODO Auto-generated method stub
+		if (myPlayer != null) {
+//释放播放器资源
+			myPlayer.release();
+		}
+		super.onDestroy();
+	}
+}
